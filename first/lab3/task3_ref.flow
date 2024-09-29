@@ -1,0 +1,26 @@
+import runtime;
+import string;
+
+fib(arr: ref [int], n:int) -> [int]{
+    if(n <= 2) { 
+        ^arr;
+    }
+    else {
+        refArrayPush(arr, ^arr[length(^arr) - 1] + ^arr[length(^arr) - 2]);
+        fib(arr, n-1)
+
+        //fib({refArrayPush(arr, ^arr[length(^arr) - 1] + ^arr[length(^arr) - 2]); arr}, n-1);
+        
+    }
+}
+
+
+arr2s(arr : [int]) -> string {
+    strGlue(map(arr,i2s),", ")
+}
+
+main(){
+    println(arr2s(fib(ref [0, 1], 10)));
+    arr: ref [int] = ref [0, 1];
+    refArrayPush(arr, 2);
+}

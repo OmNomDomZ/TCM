@@ -1,0 +1,33 @@
+import ds/array;
+import ds/tree;
+
+inds (arr : [int], m : int) -> [Pair<int, int>] {
+    tree = foldi(arr, makeTree(), \index, initTree, value -> {
+        ind_arr = lookupTree(initTree, value);
+        switch (ind_arr){
+            None(): setTree(initTree, value, [index]);
+            Some(y): setTree(initTree, value, concat(y, [index]));
+        }
+    });
+    foldi(arr, [], \index, acc, x -> {
+        ind = lookupTree(tree, m - x);
+        switch (ind){
+            None(): acc;
+            Some(y): 
+                concat(acc, fold(y, [], \tmp, value -> {
+                    if (value != index) {
+                        concat(tmp, [Pair(value, index)]);
+                    }
+                    else {
+                        tmp;
+                    }
+            })); 
+        }
+    });
+}
+
+main(){
+    arr : [int] = [1,2,3,4,4,3,0,12];
+    m = 6;
+    println(inds(arr,m));
+}

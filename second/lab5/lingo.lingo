@@ -1,0 +1,9 @@
+exp    = num | mult | add | sub;
+
+add    = "(" ws* exp:l ws* "+" ws* exp:r ws* ")"       { Add(:l, :r) };
+sub    = "(" ws* exp:l ws* "-" ws* exp:r ws* ")"       { Sub(:l, :r) };
+mult   = "(" ws* exp:l ws* "*" ws* exp:r ws* ")"       { Mul(:l, :r) };
+num    = digit+ $d                                     { Const(s2i($d)) };
+
+digit  = '0'-'9';
+ws     = ' ' | '\t' | '\n';

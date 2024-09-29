@@ -1,0 +1,11 @@
+import runtime;
+import string;
+
+arr2s(arr : [int]) -> string {
+    strGlue(map(arr,i2s),", ")
+}
+
+main(){
+    arr:[int] = [1,2,3];
+    println(arr2s(arr));
+}
