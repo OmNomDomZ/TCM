@@ -26,17 +26,18 @@ calculateAst(exp: Exp) -> int {
     }
 }
 
-ast2rpm(exp: Exp) -> string{
+ast2rp(exp: Exp) -> string{
     switch (exp) {
-        Add         (l, r) :    concatStrings([ast2rpm(l), " ", ast2rpm(r)," + "]);
-        Sub         (l, r) :    concatStrings([ast2rpm(l), " ", ast2rpm(r)," - "]);
-        Mult        (l, r) :    concatStrings([ast2rpm(l)," ",ast2rpm(r)," * "]);
+        Add         (l, r) :    concatStrings([ast2rp(l), " ", ast2rp(r)," + "]);
+        Sub         (l, r) :    concatStrings([ast2rp(l), " ", ast2rp(r)," - "]);
+        Mult        (l, r) :    concatStrings([ast2rp(l)," ",ast2rp(r)," * "]);
         Num         (num)  :    concatStrings([i2s(num), " "]);
     }
 }
 
-calculateRpm(rpm : string) -> int{
-    chars = strSplit2WithoutLeave(rpm, [" "]);
+
+calculateRp(rp : string) -> int{
+    chars = strSplit2WithoutLeave(rp, [" "]);
 
     res = fold(chars, ref[],\stack,exp ->{
         if(isDigit(exp)){
@@ -56,6 +57,8 @@ calculateRpm(rpm : string) -> int{
             b = pop(stack);
             c = b - a;
             push(stack, c)
+        } else {
+            push(stack, s2i(exp))
         }
 
         stack;
@@ -79,7 +82,7 @@ push(stack : ref[int], element : int)
 main(){
     ast = parsic(
         compilePegGrammar("#include lingo.lingo"),
-        "(((2 * 2) + (3 * 8))   -   1 )",
+        "(((22 * 2) + (3 * 8))   -   1 )",
         defaultPegActions
     );
 
@@ -90,8 +93,10 @@ main(){
     println("Result: " + i2s(calculateAst(ast)));
 
 
-    rpm = ast2rpm(ast);
-    println("AST to RPM: " + rpm);
+    rp = ast2rp(ast);
+    println("AST to RP: " + rp);
 
-    println("RPM result: " + i2s(calculateRpm(rpm)))
+    println("RP result: " + i2s(calculateRp(rp)));
+
+    quit(0);
 }
