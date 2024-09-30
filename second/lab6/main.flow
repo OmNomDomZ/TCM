@@ -1,0 +1,97 @@
+import lingo/pegcode/driver;
+import string;
+
+Exp ::= Add, Sub, Mult, Num;
+
+Add     (left: Exp, right: Exp);
+Sub     (left: Exp, right: Exp);
+Mult    (left: Exp, right: Exp);
+Num     (num: int);
+
+exp2s(exp: Exp)->string{
+    switch(exp){
+        Add         (l, r) :   "(" 	+ exp2s(l) + "+" + exp2s(r) + ")";
+        Sub	        (l, r) :   "(" 	+ exp2s(l) + "-" + exp2s(r) + ")";
+        Mult	    (l, r) :   "(" 	+ exp2s(l) + "*" + exp2s(r) + ")";
+        Num         (num)  :    i2s(num);
+    }
+}
+
+calculateAst(exp: Exp) -> int {
+    switch (exp) {
+        Add         (l, r) :    calculateAst(l) + calculateAst(r);
+        Sub         (l, r) :    calculateAst(l) - calculateAst(r);
+        Mult        (l, r) :    calculateAst(l) * calculateAst(r);
+        Num         (num)  :    num;
+    }
+}
+
+ast2rpm(exp: Exp) -> string{
+    switch (exp) {
+        Add         (l, r) :    concatStrings([ast2rpm(l), " ", ast2rpm(r)," + "]);
+        Sub         (l, r) :    concatStrings([ast2rpm(l), " ", ast2rpm(r)," - "]);
+        Mult        (l, r) :    concatStrings([ast2rpm(l)," ",ast2rpm(r)," * "]);
+        Num         (num)  :    concatStrings([i2s(num), " "]);
+    }
+}
+
+calculateRpm(rpm : string) -> int{
+    chars = strSplit2WithoutLeave(rpm, [" "]);
+
+    res = fold(chars, ref[],\stack,exp ->{
+        if(isDigit(exp)){
+            push(stack,s2i(exp));
+        } else if(exp == "+"){
+            a = pop(stack);
+            b = pop(stack);
+            c = a + b;
+            push(stack,c);
+        } else if (exp == "*"){
+            a = pop(stack);
+            b = pop(stack);
+            c = a * b;
+            push(stack, c) 
+        } else if (exp == "-"){
+            a = pop(stack);
+            b = pop(stack);
+            c = b - a;
+            push(stack, c)
+        }
+
+        stack;
+    });
+
+    pop(res);
+}
+
+pop(stack : ref [int]) -> int
+{
+   a = lastElement(^stack, 0);
+   stack := subrange(^stack, 0, length(^stack) - 1); 
+   a;
+}
+
+push(stack : ref[int], element : int) 
+{
+    refArrayPush(stack, element);
+}
+
+main(){
+    ast = parsic(
+        compilePegGrammar("#include lingo.lingo"),
+        "(((2 * 2) + (3 * 8))   -   1 )",
+        defaultPegActions
+    );
+
+    println("AST: ");
+    println(ast);
+    println("");
+    println("Parsed AST: " + exp2s(ast));
+    println("Result: " + i2s(calculateAst(ast)));
+
+
+    rpm = ast2rpm(ast);
+    println("AST to RPM: " + rpm);
+
+    println("RPM result: " + i2s(calculateRpm(rpm)))
+}

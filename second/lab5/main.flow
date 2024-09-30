@@ -3,18 +3,16 @@ import lingo/pegcode/driver;
 
 // Определение типов для выражений и операций
 export {
-    Expr ::= Add, Sub, Mul, Const, Null;
+    Expr ::= Add, Sub, Mul, Const;
 
     Add(left: Expr, right: Expr);
     Sub(left: Expr, right: Expr);
     Mul(left: Expr, right: Expr);
     Const(value: int);
-    Null();
 
     calculate(ex: Expr) -> int;
     inf2str(ex: Expr, inMul: bool) -> string;
     parse(source: string) -> Expr;
-    convert(ex: Expr) -> Expr;
 }
 
 // Функция вычисления выражения
@@ -24,7 +22,6 @@ calculate(ex: Expr) -> int {
         Add(l, r): calculate(l) + calculate(r);
         Sub(l, r): calculate(l) - calculate(r);
         Mul(l, r): calculate(l) * calculate(r);
-        Null(): 0;
     }
 }
 
@@ -41,23 +38,6 @@ inf2str(ex: Expr, inMul: bool) -> string {
             if (inMul) "(" + s + ")" else s;
         }
         Mul(l, r): inf2str(l, true) + " * " + inf2str(r, true);
-        Null(): "Null";
-    }
-}
-
-// Функция преобразования и упрощения выражения
-convert(ex: Expr) -> Expr {
-    simp_ex = switch(ex) {
-        Add(l, r): Add(convert(l), convert(r));
-        Sub(l, r): Sub(convert(l), convert(r));
-        Mul(l, r): Mul(convert(l), convert(r));
-        default: ex;
-    };
-
-    if (simp_ex == ex) {
-        simp_ex;
-    } else {
-        convert(simp_ex);
     }
 }
 
@@ -68,7 +48,7 @@ arithGrammar() {
     onlyOnce(arithGrammarOp, \ -> {
         compilePegGrammar("#include lingo.lingo");
     });
-}
+}   
 
 // Функция для разбора выражения
 parse(source: string) -> Expr {
@@ -79,19 +59,13 @@ parse(source: string) -> Expr {
 // Главная функция
 main() {
     // Заданное выражение
-    expr : string = "(((2 * 2) + (3 * 8)) - 1)";
+    expr : string = "((((2 * 2) + (3 * 8)) - 2) * 2)";
     
     // Печатаем выражение
     println("Expression: " + expr);
     e : Expr = parse(expr);
     println(e);
     println(inf2str(e, false) + " = " + i2s(calculate(e)));
-
-    // Конвертируем и упрощаем выражение
-    simpEx: Expr = convert(e);
-    println("Converted expression:");
-    println(simpEx);
-    println(inf2str(simpEx, false) + " = " + i2s(calculate(simpEx)));
 
     quit(0);
 }
