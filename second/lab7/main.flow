@@ -1,0 +1,174 @@
+import string;
+import lingo/pegcode/driver;
+import ds/tree;
+import math/math;
+
+Exp ::= Sum, Sub, Mult, Div, Num, Var, Neg;
+Sum(l:Exp, r:Exp);
+Sub(l:Exp, r:Exp);
+Mult(l:Exp, r:Exp);
+Div(l:Exp, r:Exp);
+Var(var:string);
+Num(val:int);
+Neg(l:Exp);
+RatNum(num: int, den: int);
+
+sumRatNum(r1: RatNum, r2: RatNum)->RatNum{
+
+    lcmnum = iabs(lcm(r1.den, r2.den));
+
+    m1 = lcmnum / r1.den;
+    m2 = lcmnum / r2.den;
+
+    new1Num = r1.num*m1;
+    new2Num = r2.num*m2;
+    
+    newDen = r1.den*m1;
+
+    newNum = new1Num + new2Num; 
+    // newDen = r1.den * r2.den;
+    if(newNum == 0){
+        RatNum(0, 1);
+    }
+    else{
+        gcdnum = iabs(gcd(newNum, newDen));
+        RatNum(newNum/gcdnum, newDen/gcdnum);
+    }
+}
+
+multRatNum(r1: RatNum, r2: RatNum)->RatNum{
+    // нод найти 
+
+    gcd1num = iabs(gcd(r1.num,r2.den));
+    gcd2num = iabs(gcd(r2.num,r1.den));
+
+    new1Num = r1.num / gcd1num;
+    new2Num = r2.num / gcd2num;
+
+    new1Den = r1.den / gcd2num;
+    new2Den = r2.den / gcd1num;
+
+    newNum = new1Num * new2Num;
+    newDen = new1Den * new2Den;
+    gcdnum = iabs(gcd(newNum, newDen));
+    RatNum(newNum/gcdnum, newDen/gcdnum);
+}
+
+ratNum2s(r : Maybe<RatNum>)->string{
+    switch(r){
+        None():"invalid expression";
+        Some(val):{
+            i2s(val.num) + "/" + i2s(val.den);
+        }
+    }
+}
+
+s2alg(s: string)->Exp{
+    gr = "#include lingo.lingo";
+    parsic(compilePegGrammar(gr), s, defaultPegActions);
+}
+
+alg2s(e :Exp)->string{
+    switch(e){
+        Sum(l,r)    : "(" + alg2s(l) + "+" + alg2s(r) + ")";
+        Sub(l,r)    : "(" + alg2s(l) + "+" + alg2s(r) + ")";
+        Mult(l,r)   : "(" + alg2s(l) + "*" + alg2s(r) + ")";
+        Div(l,r)    : "(" + alg2s(l) + "/" + alg2s(r) + ")";
+        Neg(v)      : "-" + alg2s(v);
+        Num(v)      : i2s(v);
+        Var(v)      : v;
+    }
+}
+
+getParam(mb1:Maybe<RatNum>, mb2:Maybe<RatNum>)->Maybe<Pair<RatNum, RatNum>>{
+    if(isSome(mb1) && isSome(mb2)){
+        v1 = either(mb1, RatNum(0, 0));
+        v2 = either(mb2, RatNum(0, 0));
+
+        Some(Pair(v1, v2));
+        
+    }
+    else{
+        None();
+    }
+}
+
+alg2i(e:Exp, varValues: Tree<string, RatNum>)->Maybe<RatNum>{
+    switch(e){
+        Sum(l,r):{
+            switch(getParam(alg2i(l, varValues), alg2i(r, varValues))){
+                Some(v) : Some(sumRatNum(v.first, v.second));
+                None()  : None();
+            }
+        }
+
+        Sub(l,r):{
+            switch(getParam(alg2i(l, varValues), alg2i(r, varValues))){
+                Some(v) : Some(sumRatNum(v.first, RatNum(0 - v.second.num, v.second.den)));
+                None()  : None();
+            }
+        }
+
+        Mult(l,r):{
+            switch(getParam(alg2i(l, varValues), alg2i(r, varValues))){
+                Some(v) : Some(multRatNum(v.first, v.second));
+                None()  : None();
+            }
+        }
+
+        Div(l,r):{
+            switch(getParam(alg2i(l, varValues), alg2i(r, varValues))){
+                Some(v) :{
+                    if(v.second.num == 0){
+                        None();
+                    }
+                    else {
+                        if(v.second.num < 0){
+                            Some(multRatNum(v.first, RatNum(-v.second.den, iabs(v.second.num))));
+                        }
+                        else{
+                            Some(multRatNum(v.first, RatNum(v.second.den, v.second.num))); 
+                        }  
+                    }
+                }
+                None()  : None();
+            }
+        }
+
+        Neg(v):{
+            switch(alg2i(v, varValues)){
+                Some(a) : Some(RatNum(-a.num, a.den));
+                None()  : None();
+            }
+        }
+
+        Num(v) : Some(RatNum(v, 1));
+
+        Var(v) : maybeBind(lookupTree(varValues, v), \a -> {
+            if (a.den == 0){
+                None()
+            } else{
+                Some(RatNum(a.num, a.den))
+            }
+        });
+    }
+}
+
+main(){
+    input = "(1 / (a - b))";
+
+    println("Input : " + input);
+    
+    vars = setTreeValues(makeTree(), [Pair("a", RatNum(1, 2)), Pair("b", RatNum(1, 2))]);
+
+    expr = s2alg(input);
+
+    println("Expression : ");
+    println(expr);
+
+    println("Parsed expression: " + alg2s(expr));
+
+    result = alg2i(expr, vars);
+    println("Result : " + ratNum2s(result));
+    quit(0);
+}
