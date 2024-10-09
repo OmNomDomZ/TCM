@@ -1,0 +1,14 @@
+exp = num | sub | mult | add | div | var | neg;
+
+add     = "(" ws* exp:l ws* "+" ws* exp:r ws* ")"       { Sum(:l, :r) };
+sub     = "(" ws* exp:l ws* "-" ws* exp:r ws* ")"       { Sub(:l, :r) };
+mult    = "(" ws* exp:l ws* "*" ws* exp:r ws* ")"       { Mult(:l, :r) };
+div     = "(" ws* exp:l ws* "/" ws* exp:r ws* ")"       { Div(:l, :r) };
+neg     = "(" ws* "-" exp:e ws* ")"                     { Neg(:e) };
+
+num     = digit+ $d                                     { RatNum(s2i($d), 1) };                                 
+var     = letter+ $v                                    { Var($v) }; 
+
+letter = 'a'-'z' | 'A'-'Z';
+digit = '0'-'9';
+ws = ' ' | '\t' | '\n'; 

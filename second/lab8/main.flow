@@ -1,0 +1,330 @@
+import string;
+import lingo/pegcode/driver;
+import ds/tree;
+import math/math;
+
+Exp ::= Sum, Sub, Mult, Div, Var, Neg, RatNum;
+Sum(l:Exp, r:Exp);
+Sub(l:Exp, r:Exp);
+Mult(l:Exp, r:Exp);
+Div(l:Exp, r:Exp);
+Var(var:string);
+Neg(l:Exp);
+RatNum(num: int, den: int);
+
+sumRatNum(r1: RatNum, r2: RatNum)->RatNum{
+
+    lcmnum = iabs(lcm(r1.den, r2.den));
+
+    m1 = lcmnum / r1.den;
+    m2 = lcmnum / r2.den;
+
+    new1Num = r1.num*m1;
+    new2Num = r2.num*m2;
+    
+    newDen = r1.den*m1;
+
+    newNum = new1Num + new2Num; 
+    // newDen = r1.den * r2.den;
+    if(newNum == 0){
+        RatNum(0, 1);
+    }
+    else{
+        gcdnum = iabs(gcd(newNum, newDen));
+        RatNum(newNum/gcdnum, newDen/gcdnum);
+    }
+}
+
+multRatNum(r1: RatNum, r2: RatNum)->RatNum{
+    // нод найти 
+
+    gcd1num = iabs(gcd(r1.num,r2.den));
+    gcd2num = iabs(gcd(r2.num,r1.den));
+
+    new1Num = r1.num / gcd1num;
+    new2Num = r2.num / gcd2num;
+
+    new1Den = r1.den / gcd2num;
+    new2Den = r2.den / gcd1num;
+
+    newNum = new1Num * new2Num;
+    newDen = new1Den * new2Den;
+    gcdnum = iabs(gcd(newNum, newDen));
+    RatNum(newNum/gcdnum, newDen/gcdnum);
+}
+
+ratNum2s(r : Maybe<RatNum>)->string{
+    switch(r){
+        None():"invalid expression";
+        Some(val):{
+            i2s(val.num) + "/" + i2s(val.den);
+        }
+    }
+}
+
+s2alg(s: string)->Exp{
+    gr = "#include lingo.lingo";
+    parsic(compilePegGrammar(gr), s, defaultPegActions);
+}
+
+alg2s(e :Exp)->string{
+    switch(e){
+        Sum(l,r)    : "(" + alg2s(l) + "+" + alg2s(r) + ")";
+        Sub(l,r)    : "(" + alg2s(l) + "+" + alg2s(r) + ")";
+        Mult(l,r)   : "(" + alg2s(l) + "*" + alg2s(r) + ")";
+        Div(l,r)    : "(" + alg2s(l) + "/" + alg2s(r) + ")";
+        Neg(v)      : "-" + alg2s(v);
+        Var(v)      : v;
+        RatNum(n,d) :{
+            if(d == 1){
+                i2s(n);
+            }
+            else if(n == 0 && d != 0){
+                i2s(0);
+            }
+            else if(d == 0){
+                "Error! Division by zero!";
+            }
+            else{
+                i2s(n) + "/" + i2s(d);
+            }
+        }
+    }
+}
+
+getParam(mb1:Maybe<RatNum>, mb2:Maybe<RatNum>)->Maybe<Pair<RatNum, RatNum>>{
+    if(isSome(mb1) && isSome(mb2)){
+        v1 = either(mb1, RatNum(0, 0));
+        v2 = either(mb2, RatNum(0, 0));
+
+        Some(Pair(v1, v2));
+        
+    }
+    else{
+        None();
+    }
+}
+
+alg2i(e:Exp, varValues: Tree<string, RatNum>)->Maybe<RatNum>{
+    switch(e){
+        Sum(l,r):{
+            switch(getParam(alg2i(l, varValues), alg2i(r, varValues))){
+                Some(v) : Some(sumRatNum(v.first, v.second));
+                None()  : None();
+            }
+        }
+
+        Sub(l,r):{
+            switch(getParam(alg2i(l, varValues), alg2i(r, varValues))){
+                Some(v) : Some(sumRatNum(v.first, RatNum(0 - v.second.num, v.second.den)));
+                None()  : None();
+            }
+        }
+
+        Mult(l,r):{
+            switch(getParam(alg2i(l, varValues), alg2i(r, varValues))){
+                Some(v) : Some(multRatNum(v.first, v.second));
+                None()  : None();
+            }
+        }
+
+        Div(l,r):{
+            switch(getParam(alg2i(l, varValues), alg2i(r, varValues))){
+                Some(v) :{
+                    if(v.second.num == 0){
+                        None();
+                    }
+                    else {
+                        if(v.second.num < 0){
+                            Some(multRatNum(v.first, RatNum(-v.second.den, iabs(v.second.num))));
+                        }
+                        else{
+                            Some(multRatNum(v.first, RatNum(v.second.den, v.second.num))); 
+                        }  
+                    }
+                }
+                None()  : None();
+            }
+        }
+
+        Neg(v):{
+            switch(alg2i(v, varValues)){
+                Some(a) : Some(RatNum(-a.num, a.den));
+                None()  : None();
+            }
+        }
+
+        RatNum(n,d) : Some(RatNum(n,d));
+        Var(v) : maybeBind(lookupTree(varValues, v), \a -> {
+            if (a.den == 0){
+                None()
+            } else{
+                Some(RatNum(a.num, a.den))
+            }
+        });
+    }
+}
+
+getRat(e:Exp)->RatNum{
+    switch(e){
+        Sum(l,r):RatNum(0,0);
+        Sub(l,r):RatNum(0,0);
+        Mult(l,r):RatNum(0,0);
+        Div(l,r):RatNum(0,0);
+        Neg(v):RatNum(0,0);
+        RatNum(n,d):RatNum(n,d);
+        Var(v):RatNum(0,0);
+    }
+}
+
+diff(e: Exp, var: string)-> Exp{
+    switch(e){
+        Sum(l,r)        : Sum(diff(l,var), diff(r,var));
+        Sub(l,r)        : Sub(diff(l,var), diff(r,var));
+        Mult(l,r)       : Sum(Mult(diff(l,var),r), Mult(l, diff(r,var)));
+        Div(l,r)        : {Div(Sub(Mult(diff(l,var), r), Mult(l,diff(r,var))), Mult(r,r));}
+        Neg(l)          : Neg(diff(l, var));
+        RatNum(n,m)     : RatNum(0, 1);
+        Var(v)          : if(v == var) RatNum(1, 1) else RatNum(0, 1);
+    }
+}
+
+reduceAlgExp(e:Exp)->Exp{
+    switch(e){
+        Sum(l,r):{
+            newL = reduceAlgExp(l);
+            newR = reduceAlgExp(r);
+
+            if(newR == RatNum(0,1)){
+                newL;
+            }
+            else if(newL == RatNum(0,1)){
+                newR;
+            }
+            else{
+                if(newL.structname == "RatNum" && newR.structname == "RatNum"){
+                    sumRatNum(getRat(newL), getRat(newR));
+                }
+                else{
+                   Sum(newL, newR); 
+                }
+            }
+        }
+
+        Sub(l,r):{
+            newL = reduceAlgExp(l);
+            newR = reduceAlgExp(r);
+
+            if(newR == RatNum(0,1)){
+                newL;
+            }
+            else if(newL == RatNum(0,1)){
+                Neg(newR);
+            }
+            else if(newL == newR){
+                RatNum(0,1);
+            }
+            else{
+                if(newL.structname == "RatNum" && newR.structname == "RatNum"){
+                    sumRatNum(getRat(newL), RatNum(0 - getRat(newR).num, getRat(newR).den));
+                }
+                else{
+                   Sub(newL, newR); 
+                }
+            }
+        }
+        Mult(l,r):{
+            newL = reduceAlgExp(l);
+            newR = reduceAlgExp(r);
+
+            if(newR == RatNum(0,1)){
+                RatNum(0,1);
+            }
+            else if(newL == RatNum(0,1)){
+                RatNum(0,1);
+            }
+            else if(newR == RatNum(1,1)){
+                newL;
+            }
+            else if(newL == RatNum(1,1)){
+                newR;
+            }
+            else if(newR == RatNum(-1,1)){
+                Neg(newL);
+            }
+            else if(newL == RatNum(-1,1)){
+                Neg(newR);
+            }
+            else{
+                if(newL.structname == "RatNum" && newR.structname == "RatNum"){
+                    multRatNum(getRat(newL),getRat(newR));
+                }
+                else{
+                    Mult(newL, newR);
+                }
+            }
+        }
+        Div(l,r):{
+            newL = reduceAlgExp(l);
+            newR = reduceAlgExp(r);
+
+            if(newR == RatNum(1,1)){
+                newL;
+            }
+            else if(newL == RatNum(0,1) && newR != RatNum(0,1)){
+                RatNum(0,1);
+            }
+            else if(newR == RatNum(0,1)){
+                RatNum(0,0);
+            }
+            else{
+                if(newL.structname == "RatNum" && newR.structname == "RatNum"){
+                    multRatNum(getRat(newL), RatNum(getRat(newR).den, getRat(newR).num));
+                }
+                else{
+                    Div(newL, newR);
+                }
+            }
+        }
+        Neg(v):{
+            newV = reduceAlgExp(v);
+            switch(newV){
+                Neg(v1):v1;
+                RatNum(n,d):RatNum(0 - n, d);
+                default: Neg(newV);
+            }
+        }
+        Var(v):Var(v);
+        RatNum(n,d):RatNum(n,d);
+    }
+}
+
+main(){
+    input = "(((x + y) / x) + ((x*1) - 5))";
+
+    println("Input : " + input);
+    
+    vars = setTreeValues(makeTree(), [Pair("x", RatNum(1, 2)), Pair("y", RatNum(1, 2))]);
+
+    expr = s2alg(input);
+
+    println("Expression : ");
+    println(expr);
+
+
+
+    println("Parsed expression: " + alg2s(expr));
+
+    result = alg2i(expr, vars);
+    resultS = ratNum2s(result);
+    println("Result : " + resultS);
+
+    exprDiff = diff(expr,"x");
+    println("Diff : " + alg2s(exprDiff));
+    
+    simpifiedExpr = reduceAlgExp(exprDiff);
+    println("Simplified diff : " + alg2s(simpifiedExpr));
+
+   
+
+}
