@@ -22,10 +22,9 @@ sumRatNum(r1: RatNum, r2: RatNum)->RatNum{
     new1Num = r1.num*m1;
     new2Num = r2.num*m2;
     
-    newDen = r1.den*m1;
+    newDen = lcmnum;
 
     newNum = new1Num + new2Num; 
-    // newDen = r1.den * r2.den;
     if(newNum == 0){
         RatNum(0, 1);
     }
@@ -36,8 +35,7 @@ sumRatNum(r1: RatNum, r2: RatNum)->RatNum{
 }
 
 multRatNum(r1: RatNum, r2: RatNum)->RatNum{
-    // нод найти 
-
+    // нод
     gcd1num = iabs(gcd(r1.num,r2.den));
     gcd2num = iabs(gcd(r2.num,r1.den));
 
@@ -70,7 +68,7 @@ s2alg(s: string)->Exp{
 alg2s(e :Exp)->string{
     switch(e){
         Sum(l,r)    : "(" + alg2s(l) + "+" + alg2s(r) + ")";
-        Sub(l,r)    : "(" + alg2s(l) + "+" + alg2s(r) + ")";
+        Sub(l,r)    : "(" + alg2s(l) + "-" + alg2s(r) + ")";
         Mult(l,r)   : "(" + alg2s(l) + "*" + alg2s(r) + ")";
         Div(l,r)    : "(" + alg2s(l) + "/" + alg2s(r) + ")";
         Neg(v)      : "-" + alg2s(v);
@@ -97,8 +95,7 @@ getParam(mb1:Maybe<RatNum>, mb2:Maybe<RatNum>)->Maybe<Pair<RatNum, RatNum>>{
         v1 = either(mb1, RatNum(0, 0));
         v2 = either(mb2, RatNum(0, 0));
 
-        Some(Pair(v1, v2));
-        
+        Some(Pair(v1, v2));  
     }
     else{
         None();
@@ -165,6 +162,7 @@ alg2i(e:Exp, varValues: Tree<string, RatNum>)->Maybe<RatNum>{
     }
 }
 
+// извлекает рац числа из выражения 
 getRat(e:Exp)->RatNum{
     switch(e){
         Sum(l,r):RatNum(0,0);
@@ -177,6 +175,7 @@ getRat(e:Exp)->RatNum{
     }
 }
 
+// производная 
 diff(e: Exp, var: string)-> Exp{
     switch(e){
         Sum(l,r)        : Sum(diff(l,var), diff(r,var));
@@ -189,6 +188,8 @@ diff(e: Exp, var: string)-> Exp{
     }
 }
 
+
+// упрощаем выражение
 reduceAlgExp(e:Exp)->Exp{
     switch(e){
         Sum(l,r):{
@@ -325,6 +326,5 @@ main(){
     simpifiedExpr = reduceAlgExp(exprDiff);
     println("Simplified diff : " + alg2s(simpifiedExpr));
 
-   
-
+   quit(0);
 }
