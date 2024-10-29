@@ -155,11 +155,11 @@ alg2i(e:Exp, varValues: Tree<string, RatNum>)->Maybe<RatNum>{
 }
 
 main(){
-    input = "(1 / (a + b))";
+    input = "(1 / (aa1aa + b))";
 
     println("Input : " + input);
     
-    vars = setTreeValues(makeTree(), [Pair("a", RatNum(-2, 5)), Pair("b", RatNum(1, 5))]);
+    vars = setTreeValues(makeTree(), [Pair("aa1aa", RatNum(-3, 5)), Pair("b", RatNum(3, 5))]);
 
     expr = s2alg(input);
 

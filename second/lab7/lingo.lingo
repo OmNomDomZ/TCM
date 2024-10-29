@@ -7,8 +7,8 @@ div     = "(" ws* exp:l ws* "/" ws* exp:r ws* ")"       { Div(:l, :r) };
 neg     = "(" ws* "-" exp:e ws* ")"                     { Neg(:e) };
 
 num     = digit+ $d                                     { Num(s2i($d)) };                                 
-var     = letter+ $v                                    { Var($v) }; 
+var     =  (letter | digit | '_')* $v                   { Var($v) }; 
 
 letter = 'a'-'z' | 'A'-'Z';
 digit = '0'-'9';
-ws = ' ' | '\t' | '\n'; 
+ws = ' ' | '\t' | '\n';
