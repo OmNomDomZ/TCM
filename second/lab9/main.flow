@@ -57,15 +57,6 @@ multRatNum(r1: RatNum, r2: RatNum)->RatNum{
     RatNum(newNum/gcdnum, newDen/gcdnum);
 }
 
-ratNum2s(r : Maybe<RatNum>)->string{
-    switch(r){
-        None():"No result";
-        Some(val):{
-            i2s(val.num) + "/" + i2s(val.den);
-        }
-    }
-}
-
 s2alg(s: string)->AlgExp{
     gr = "#include lingo.lingo";
     parsic(compilePegGrammar(gr), s, defaultPegActions);
@@ -100,17 +91,6 @@ alg2s(e :AlgExp)->string{
             }
         }
         AlgVar(v): v;
-    }
-}
-
-getParam(mb1:Maybe<RatNum>, mb2:Maybe<RatNum>)->Maybe<Pair<RatNum, RatNum>>{
-    if(isSome(mb1) && isSome(mb2)){
-        v1 = either(mb1, RatNum(0, 0));
-        v2 = either(mb2, RatNum(0, 0));
-        Some(Pair(v1, v2));
-    }
-    else{
-        None();
     }
 }
 
@@ -492,72 +472,6 @@ similar2s(rfpod: Tree<string, int>)->string{
     }
 }
 
-alg2RatNum(e:AlgExp, varValues: Tree<string, RatNum>)->Maybe<RatNum>{
-    switch(e){
-        AlgSum(l,r):{
-            switch(getParam(alg2RatNum(l, varValues), alg2RatNum(r, varValues))){
-                Some(v):Some(sumRatNum(v.first, v.second));
-                None():None();
-            }
-        }
-
-        AlgSub(l,r):{
-            switch(getParam(alg2RatNum(l, varValues), alg2RatNum(r, varValues))){
-                Some(v):Some(sumRatNum(v.first, RatNum(0 - v.second.num, v.second.den)));
-                None(): None();
-            }
-        }
-
-        AlgMult(l,r):{
-            switch(getParam(alg2RatNum(l, varValues), alg2RatNum(r, varValues))){
-                Some(v): Some(multRatNum(v.first, v.second));
-                None(): None();
-            }
-        }
-
-        AlgDiv(l,r):{
-            switch(getParam(alg2RatNum(l, varValues), alg2RatNum(r, varValues))){
-                Some(v):{
-                    if(v.second.num == 0){
-                        None();
-                    }
-                    else {
-                        if(v.second.num < 0){
-                            Some(multRatNum(v.first, RatNum(-v.second.den, iabs(v.second.num))));
-                        }
-                        else{
-                            Some(multRatNum(v.first, RatNum(v.second.den, v.second.num))); 
-                        }  
-                    }
-                }
-                None(): None();
-            }
-        }
-
-        AlgNeg(v):{
-            switch(alg2RatNum(v, varValues)){
-                Some(a):Some(RatNum(0 - a.num, a.den));
-                None():None();
-            }
-        }
-
-        AlgRat(n,d):Some(RatNum(n, d));
-        AlgVar(v):maybeBind(lookupTree(varValues, v), \a -> {Some(RatNum(a.num, a.den))});
-    }
-}
-
-diff(e: AlgExp, var: string)->AlgExp{
-    switch(e){
-        AlgSum(l,r):AlgSum(diff(l,var), diff(r,var));
-        AlgSub(l,r):AlgSub(diff(l,var), diff(r,var));
-        AlgMult(l,r):AlgSum(AlgMult(diff(l,var),r), AlgMult(l, diff(r,var)));
-        AlgDiv(l,r):{AlgDiv(AlgSub(AlgMult(diff(l,var), r), AlgMult(l,diff(r,var))), AlgMult(r,r));}
-        AlgNeg(v):AlgNeg(diff(v, var));
-        AlgRat(n,d):AlgRat(0, 1);
-        AlgVar(v):if(v == var) AlgRat(1, 1) else AlgRat(0, 1);
-    }
-}
-
 reduceAlgExp(e:AlgExp)->AlgExp{
     switch(e){
         AlgSum(l,r):{
@@ -700,7 +614,8 @@ executeStr(str : string){
 }
 
 main(){
-    str = "((x+y)*(y-x))";
-    
+    str = "(((4 * (a * a)) - 9) * ((1 / ((2 * a) - 3)) - (1 / ((2 * a) + 3))))";
     executeStr(str);
+
+    quit(0);
 }
