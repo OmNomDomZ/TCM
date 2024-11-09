@@ -194,17 +194,22 @@ reduceRatFunc(rf: RatFunc) -> RatFunc
         rf;
     }
     else{
+        // общий множитель для числителя и знаменателя 
 	    nomCom = commonFactForSum(rf.nominator);
 	    denCom = commonFactForSum(rf.denominator);
 
+        // делим числитель и знаменателб на множители
 	    nomRest = dividePolySum(rf.nominator, nomCom);
 	    denRest = dividePolySum(rf.denominator, denCom);
 
+        // общий множитель множителей
 	    comsCom = commonFactForFacts(nomCom, denCom);
 
+        // делим множители на общий множитель
    	    nomComRest = dividePolySum(nomCom, comsCom);
 	    denComRest = dividePolySum(denCom, comsCom);
 
+        // остатки равны
 	    if(nomRest == denRest)
 	    {
 		    RatFunc(nomComRest, denComRest);
