@@ -230,6 +230,7 @@ commonFactForSum(p: PolySum)->PolySum
 	PolySum(makeTree1(commonFactPolyMultForSum(p), commonFactNumForSum(p)));
 }
 
+// вычисляет общую множность всех членов многочлена
 commonFactPolyMultForSum(p: PolySum) -> PolyMult 
 {
 	if (p.sum == TreeEmpty()) PolyMult(TreeEmpty())
@@ -252,6 +253,7 @@ commonFactPolyMultForSum(p: PolySum) -> PolyMult
 	}
 }
 
+// вычисляет общий делитель всех числовых коэффициентов
 commonFactNumForSum(p: PolySum) -> int
 {
 	if (p.sum == TreeEmpty()) 1
@@ -264,6 +266,7 @@ commonFactNumForSum(p: PolySum) -> int
 	}
 }
 
+// вычисляет НОД числовых коэффициентов и находит общий множитель 
 commonFactForFacts(p1: PolySum, p2: PolySum) -> PolySum
 {
 	if(p1.sum == TreeEmpty() || p2.sum == TreeEmpty()) PolySum(makeTree1(PolyMult(TreeEmpty()), 1))
@@ -287,6 +290,7 @@ commonFactForFacts(p1: PolySum, p2: PolySum) -> PolySum
 	}
 }
 
+// делим числитель на знаменатель
 dividePolySum(pnum: PolySum, pden: PolySum) -> PolySum
 {
     if(PolySum2s(pden) == "1"){
@@ -314,7 +318,9 @@ dividePolySum(pnum: PolySum, pden: PolySum) -> PolySum
 	
 }
 
+// упрощает части многочлена, разделяя положительные и отрицательные члены и суммируя их с учётом одинаковых слагаемых
 similarParts(p:PolySum) -> Tree<string, int>{
+    // получает члены с положительными коэффициентами
     plusValues = filterTree(p.sum, \key, value ->{
         if(value > 0){
             true;
@@ -323,6 +329,7 @@ similarParts(p:PolySum) -> Tree<string, int>{
         }
     });
 
+    // создаёт дерево для положительных членов, суммируя одинаковые части
     textTreePlus = foldTree(plusValues, TreeEmpty(), \k,v,acc ->{
         mergeTreeCustom(acc,
             makeTree1( PolyMult2s(k), v),
