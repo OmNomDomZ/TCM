@@ -1,0 +1,82 @@
+// var_decl_list -- объявленные переменные 
+// body -- тело программы
+prog = ws var_decl_list:v ws body:b {Prog(:v, :b)}; 
+
+all = cmds | S;
+cmds = array | body | var_decl_list;
+S = sum | mul | int | subs | div | neg | var | app;
+
+// декларированные слова, чтобы отличить от переменных 
+keywords = decl_word | type | array_keywords;
+array_keywords = "CONCAT" | "APP" | "UPD" | "LENGTH"; 
+decl_word = "VAR";
+
+// список объявленных переменных 
+var_decl_list = ((ws var_decl)*):v {NmVarDecList(:v)};
+// правило объявления переменной
+var_decl = decl_word ws var:v ":" ws type:t ws ";" {NmVarDec(:v, :t)};
+
+// определяет правило для типов 
+type = arrayed_type | simple_type;
+
+simple_type = "INT" {Type("INT")} | "BOOL" {Type("BOOL")};
+
+// тип массива -- может быть записан как INT ARRAY OF INT
+arrayed_type = simple_type ws "ARRAY" ws "OF" ws type:t {ArrayType(:t)};
+
+// массив с элементами или пустой массив
+array = array_with_els | empty_array;
+array_elem = array | S;
+// конструкция [ ... ], где внутри элементы массива
+array_with_els = "[" ws array_elem:e (("," ws array_elem)*):els ws "]" {Array(consArray(:e, :els))};
+empty_array = "[" ws "]" {Array(emptyArray())};
+
+// вызовы функций для работы с массивами
+array_functions = concat | app | upd | length;
+// объединение массивов в один
+concat = "CONCAT" ws "(" ws (var | array):a ws "," ws (var | array):b ws ")" {ArrayConcat(:a, :b)};
+// доступ к элементу массива 
+app = "APP" ws "(" ws (var | array):e ws "," ws S:ind ws ")" {ArrayApp(:e, :ind)};
+// обновление элемента массива
+upd = "UPD" ws "(" ws (var | array):e ws "," ws S:ind ws "," ws S:val ws ")" {ArrayUpd(:e, :ind, :val)};
+// длина массива 
+length = "LENGTH" ws "(" ws (var | array):e ws ")" {ArrayLength(:e)};
+
+// правила логических выражений
+logic = not | and | or | cmps;
+not = "NOT" ws "(" logic:v ")"{Not(:v)};
+and = "(" ws logic:l ws "AND" ws logic:r ws ")" {And(:l, :r)};
+or = "(" ws logic:l ws "OR" ws logic:r ws ")" {Or(:l, :r)};
+
+// сравнения 
+cmps = eq | lt | gt | le | ge;
+gt = S:l ws ">" ws S:r {Gt(:l, :r)};
+ge = S:l ws ">=" ws S:r {Ge(:l, :r)};
+le = S:l ws "<=" ws S:r {Le(:l, :r)};
+lt = S:l ws "<" ws S:r {Lt(:l, :r)};
+eq = S:l ws "==" ws S:r {Eq(:l, :r)};
+neq = S:l ws "!=" ws S:r {Neq(:l, :r)};
+
+// правила для тела программы
+body =   assg | test | non_det_iter | sequence | non_det_choice | array_functions;
+// присваивание x := expr
+assg = var:l ws ":=" ws (S|array|array_functions):r {Assg(:l, :r)};
+// проверка условия (x < n)?
+test = "(" ws logic:v ws ")" ws "?" {Test(:v)};
+non_det_iter = (sequence|non_det_choice|assg|test):v ws "*" {NonDetIter(:v)};
+//  блок { ... }, внутри которого несколько операторов, разделённых ;
+sequence = "{" ws body:e ((ws ";" ws body)*):els ws ";" ws "}" {Sequence(consArray(:e, :els))};
+// блок { ... } с операторами, разделёнными U. Означает недетерминированный выбор
+non_det_choice = "{" ws ws body:e ((ws "U" ws body)*):els ws ";" ws "}" {NonDetChoice(consArray(:e, :els))};
+
+
+digit = '0'-'9';
+alpha = 'a'-'z' | 'A'-'Z';
+var = ws !keywords alpha+$s ws {Var($s)};
+int = ws digit+$s {Int(s2i($s))};
+ws = (' ' | '\t' | '\n' | '\r')*;
+neg = "(" ws "-" ws S:l ws ")" {Neg(:l)};
+sum = "(" ws S:l ws "+" ws S:r ws ")" {Sum(:l, :r)};
+mul = "(" ws S:l ws "*" ws S:r ws ")" {Mul(:l, :r)};
+subs = "(" ws S:l ws "-" ws S:r ws ")" {Sub(:l, :r)};
+div = "(" ws S:l ws "/" ws S:r ws ")" {Div(:l, :r)};

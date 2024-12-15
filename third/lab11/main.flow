@@ -1,0 +1,86 @@
+import ds/tree;
+import ds/set;
+import string;
+import lingo/pegcode/driver;
+
+Expr ::= Sum, Mul, Sub, Var, Div, Neg, Int;
+Sum(lhs: Expr, rhs: Expr);
+Sub(lhs: Expr, rhs: Expr);
+Mul(lhs: Expr, rhs: Expr);
+Div(n: Expr, d: Expr);
+Var(name: string);
+Neg(hs: Expr);
+Int(var: int);
+
+IntType ::= Expr;
+ArrayElem ::= Array, Expr;
+Array(els: [ArrayElem]);
+
+ArrayType = Array;
+
+Types ::= IntType, ArrayType;
+
+Type(name: string);
+ArrayType(type: Type);
+NmVarDec(var: flow, type: flow);
+NmVarDecList(decls: [NmVarDec]);
+
+Logic ::= Cmps, Not, And, Or;
+
+Not(l: Cmps);
+And(l: Cmps, r: Cmps);
+Or(l: Cmps, r: Cmps);
+
+Cmps ::= Eq, Lt, Gt, Le, Ge, Neq;
+
+Eq(l: Expr, r: Expr);
+Lt(l: Expr, r: Expr);
+Gt(l: Expr, r: Expr);
+Le(l: Expr, r: Expr);
+Ge(l: Expr, r: Expr);
+Neq(l: Expr, r: Expr); 
+
+arArg ::= Var, Array;
+ArFunction ::= ArrayConcat, ArrayApp, ArrayUpd, ArrayLength;
+ArrayConcat(l: arArg, r: arArg);
+ArrayApp(array: arArg, ind:Expr);
+ArrayUpd(array: arArg, ind: Expr, val: Expr);
+ArrayLength(array: arArg);
+
+Body ::= Assg, Test, Sequence, NonDetChoice, NonDetIter;
+Assg(var: Var, val: Types);
+Test(cmp: Cmps);
+Sequence(els: [Body]);
+NonDetChoice(els: [Body]);
+NonDetIter(body: Body);
+Prog(vl: NmVarDecList, b: Body);
+
+s2expr(str: string) -> Prog {
+    grammar = "#include nemo.lingo";
+    parsic(compilePegGrammar(grammar), str, defaultPegActions);
+}
+
+// нет дубликатов
+nmProgTypedecls(prog : Prog) -> Tree<string, Types> {
+	fold(prog.vl.decls, makeTree(), \acc, decl -> {
+		if (containsKeyTree(acc, decl.var)) {
+            println("duplicate variable declararion: " + decl.var.name)
+		}
+		setTree(acc, decl.var, decl.type)
+	})
+}
+
+main() {
+    file = "tests/test0.nm";
+    fileContent = getFileContent(file);
+    
+	println2("AST nemo: ");
+	println2("\n");
+    ast = s2expr(fileContent);
+    println2(ast);
+    println2("\n");
+
+    nmProgTypedecls(ast);
+
+	quit(0);
+}
