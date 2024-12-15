@@ -1,0 +1,17 @@
+import nemo;
+import vm;
+
+main() {
+    nemoCodeTxt = getFileContent("tests/fib.nm"); 
+    println("Parsed nemo code:\n" + nemoCodeTxt + "\n\n");
+
+    switch (tryParseNemo(nemoCodeTxt)) {
+        Some(nemo): {
+            nemoVm = nemo2nvm(nemo);
+            printvmProg(nemoVm);
+            ExecuteNemo(nemoVm);
+        };
+        None(): println("Failed to generate VM code!");
+    }
+    quit(0);
+}

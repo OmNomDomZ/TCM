@@ -1,0 +1,15 @@
+VAR n : INT;
+VAR fib : ARRAY OF INT;
+VAR i : INT;
+{
+	n := 10;
+	fib := UPD(fib, 0, 1);
+	fib := UPD(fib, 1, 1);
+	i := 2;
+  {{
+    (i < n)?;
+		fib := UPD(fib, i, (APP(fib, (i - 1)) + APP(fib, (i - 2))));
+		i := (i + 1);
+	}}*;
+	print(fib);
+}

@@ -1,0 +1,440 @@
+import nemo;
+
+export {
+    vmProg : (decl: [vmDecl], body: [vmLine]);
+    printvmProg(prog: vmProg) -> void;
+    ExecuteNemo(prog: vmProg) -> void;
+    
+    vmDecl : (v: vmVar, t: vmType);
+    vmLine : (label: int, instruction: vmInstruction, goto: [int]);
+
+    vmInstruction ::= vmPrint, vmAssign, vmTest;
+    vmPrint : (e: vmExpr);
+    vmTest : (b: vmBool);
+    vmAssign : (v: vmVar, e: vmExpr);
+
+    vmType ::= vmIntType, vmArrayType;
+    vmIntType : ();
+    vmArrayType : (t: vmType);
+
+    vmVal ::= vmArray, vmInt;
+
+    vmExpr ::= vmArray, vmUpdate, vmUnit;
+    vmUnit ::= vmInt, vmSub, vmAdd, vmDiv, vmMult, vmNegative, vmVar, vmAppeal;
+
+    vmAdd : (v1: vmUnit, v2: vmUnit);
+    vmSub : (v1: vmUnit, v2: vmUnit);
+    vmMult : (v1: vmUnit, v2 : vmUnit);
+    vmDiv : (v1: vmUnit, v2 : vmUnit);
+    vmNegative : (v: vmUnit);
+    vmInt : (val: int);
+    vmVar : (val: string);
+    vmArray : (e: [vmVal]);
+    vmAppeal : (arr: vmVar, i: vmExpr);
+    vmUpdate : (arr: vmVar, i: vmExpr, val: vmExpr);
+
+    vmBool ::= vmAnd, vmOr, vmNot, vmPred, vmTrue;
+    vmTrue : ();
+    vmAnd : (b1: vmBool, b2: vmBool);
+    vmOr : (b1: vmBool, b2: vmBool);
+    vmNot : (b: vmBool);
+    vmPred : (e1: vmExpr, e2: vmExpr, c: vmCondition);
+    vmCondition ::= vmEq, vmNotEq, vmLsEq, vmGrEq, vmLs, vmGr;
+    vmEq(); vmNotEq(); vmLsEq(); vmGrEq(); vmLs(); vmGr();
+
+    nemo2nvm(nemo: Prog) -> vmProg;
+}
+
+ia2sa(arr: [int]) -> string {
+    strGlue(map(arr, i2s), ", ");
+}
+
+evaluateArrTypeN(t: vmType)
+{
+  switch(t)
+  {
+    vmIntType(): "INT;";
+    vmArrayType(innerT): "ARRAY OF " + evaluateArrTypeN(innerT);
+  }
+}
+
+printDecl(declVm : vmDecl){
+  switch(declVm.t)
+  {
+    vmIntType(): println("VAR "+ declVm.v.val + ": INT;"); 
+    vmArrayType(t): println("VAR " + declVm.v.val + ": INT ARRAY OF " + evaluateArrTypeN(t));
+  }
+}
+
+printVmLine(line: vmLine) -> void {
+    ins = line.instruction;
+    switch(ins) {
+        vmTest(b): println(i2s(line.label) + ": if " + bool2s(b) + " then " + "{" + ia2sa(line.goto) + "}" + " else {} ");
+        vmAssign(v, e): println(i2s(line.label) + ": " + v.val + " := " + expr2s(e) + " goto {" + ia2sa(line.goto) + "}");
+        vmPrint(v): println(i2s(line.label) + ": print(" + expr2s(v) + ")" + " goto {" + ia2sa(line.goto) + "}");
+    }
+}
+
+cond2s(c : vmCondition) -> string {
+    switch(c) {
+        vmEq(): "==";
+        vmNotEq(): "!=";
+        vmLsEq(): "<=";
+        vmGrEq(): ">=";
+        vmGr(): ">";
+        vmLs(): "<";
+    }
+}
+
+bool2s(b: vmBool) -> string {
+    switch(b) {
+        vmTrue(): "(TRUE)";
+        vmAnd(b1, b2): "(" + bool2s(b1) + " AND " + bool2s(b2) + ")";
+        vmOr(b1, b2): "(" + bool2s(b1) + " OR " + bool2s(b2) + ")";
+        vmNot(b1): "(NOT" + bool2s(b1) + ")";
+        vmPred(e1, e2, c): "(" + expr2s(e1) + " " + cond2s(c) + " " + expr2s(e2) + ")"; 
+    }
+}
+
+expr2s(expr : vmExpr) -> string {
+    switch(expr) {
+        vmArray(e): strGlue(map(e,val2s), ", ");
+        vmUpdate(arr, i, val): "UPD(" + arr.val + ", " + expr2s(i) + ", " + expr2s(val) + ")";
+        vmAdd(v1, v2): "(" + expr2s(v1) + " + " + expr2s(v2) + ")";
+        vmSub(v1, v2): "(" + expr2s(v1) + " - " + expr2s(v2) + ")";
+        vmDiv(v1, v2): "(" + expr2s(v1) + " / " + expr2s(v2) + ")";
+        vmMult(v1, v2): "(" + expr2s(v1) + " * " + expr2s(v2) + ")";
+        vmNegative(v): "(-" + expr2s(v) + ")";
+        vmVar(v): v;
+        vmInt(v): i2s(v);
+        vmAppeal(arr, i): "APP(" + arr.val + ", " + expr2s(i) + ")"; 
+    }
+}
+
+vmState : (s : [Pair<int,Tree<string, vmVal>>] );
+initVmState(prog: vmProg) {
+    vmState(
+        [Pair(
+            0,
+            d2t(prog.decl)
+        )]
+    )
+}
+mapState(goto: [int], t: Tree<string, vmVal>) {
+    vmState(map(goto, \e -> Pair(e, t)))
+}
+
+ExecuteNemo(prog: vmProg) -> void {
+    init = 0;
+    limit = 250;
+    ExecuteNemoInternal(
+        prog.body,
+        initVmState(prog),
+        init,
+        limit
+    )
+}
+ 
+ExecuteNemoInternal(body: [vmLine], state: vmState, cur: int, limit: int) -> void {
+    end = length(body);
+    newState = fold(state.s, vmState([]), \acc, e-> {
+        // println(e);
+        // println(body[e.first]);
+        s = execLine(body[e.first], e.second);
+        vmState(filter(concat(acc.s, s.s), \ee->ee.first != end))
+    });
+    if (length(newState.s) > 0 && cur < limit) {
+        ExecuteNemoInternal(body, newState, cur + 1, limit);
+    }
+}
+
+execLine(line: vmLine, vars: Tree<string, vmVal>) -> vmState {
+    switch (line.instruction) {
+        vmAssign(v,e): {
+            t = setTree(vars, v.val, eval(e, vars));
+            mapState(line.goto, t);
+        }
+        vmTest(b): if (cmp(b, vars)) mapState(line.goto, vars) else vmState([]);
+        vmPrint(e): {
+            println(val2s(eval(e, vars)));
+            mapState(line.goto, vars);
+        }
+    }
+}
+
+eval(e: vmExpr, vars: Tree<string, vmVal>) -> vmVal {
+    switch(e) {
+        vmInt(v): e;
+        vmArray(v): e;
+        vmAdd(v1,v2): biEval(v1,v2, vars, \a,b -> a + b);
+        vmSub(v1,v2): biEval(v1,v2, vars, \a,b -> a - b);
+        vmMult(v1,v2): biEval(v1,v2, vars, \a,b -> a * b);
+        vmDiv(v1,v2): biEval(v1,v2, vars, \a,b -> a / b);
+        vmNegative(v): vmInt(evali(v, vars));
+        vmVar(x): findVar(e, vars);
+        vmAppeal(v1,v2): {
+            arr = findVar(v1,vars);
+            ind = evali(v2, vars);
+            getByIndex(arr, ind);
+        }
+        vmUpdate(v1,v2,v3): {
+            val = eval(v3, vars);
+            ind = evali(v2, vars);
+            setByIndex(v1,ind,val,vars);
+        }
+    }
+}
+
+biEval(v1: vmExpr, v2: vmExpr, vars: Tree<string, vmVal>, fn: (int,int)->int) -> vmInt {
+    vmInt(fn(
+        evali(v1, vars),
+        evali(v2, vars)
+    ))
+}
+
+evali(e: vmExpr, vars: Tree<string, vmVal>) -> int {
+    val2i(eval(e, vars));
+}
+
+setByIndex(arv: vmVar, ind: int, val: vmVal, vars: Tree<string, vmVal> ) {
+    arr = switch(findVar(arv,vars)) {
+        vmArray(e): e;
+        vmInt(v): {
+            terminateWithError("Illegal argument. Cannot use update on non-array var.");
+            [];
+        }
+    };
+    len = length(arr);
+    if (ind < len) {
+        vmArray(replace(arr, ind, val));
+    } else {
+        vmArray(concat3(arr, arrayRepeat(vmInt(0), ind - len), [val]))
+    }
+}
+
+getByIndex(arr: vmVal, ind: int) -> vmVal {
+    switch (arr) {
+        vmArray(e): {
+            if (ind < length(e)) {
+                e[ind]
+            } else {
+                terminateWithError("Index "+ i2s(ind) +" out of bound " + i2s(length(e)));
+                vmInt(-1);
+            }
+        }
+        vmInt(v): {
+            terminateWithError("getByIndex(arr): expected vmArray, got vmInt");
+            vmInt(-1);
+        }
+    }
+}
+
+cmp(b: vmBool, vars: Tree<string, vmVal>) -> bool {
+    switch (b) {
+        vmBool(): true;
+        vmAnd(b1,b2): cmp(b1,vars) && cmp(b2,vars);
+        vmOr(b1,b2): cmp(b1,vars) && cmp(b2, vars);
+        vmNot(bb): !cmp(bb, vars);
+        vmPred(v1,v2,c): {
+            vv1 = val2i(eval(v1, vars));
+            vv2 = val2i(eval(v2, vars));
+            switch(c) {
+                vmEq(): vv1 == vv2;
+                vmNotEq(): vv1 != vv2;
+                vmLs(): vv1 < vv2;
+                vmLsEq(): vv1 <= vv2;
+                vmGr(): vv1 > vv2;
+                vmGrEq(): vv1 >= vv2;
+            }
+        }
+    }
+}
+
+findVar(var: vmVar, vars: Tree<string, vmVal>) -> vmVal {
+    v = lookupTree(vars, var.val);
+    switch (v) {
+        Some(vv) : vv;
+        None() : {
+            terminateWithError("Cannot find var: " + var.val);
+            vmInt(-1);
+        }
+    }
+}
+
+val2s(v: vmVal) -> string {
+    switch(v) {
+        vmInt(vv): i2s(vv);
+        vmArray(e): "[" + strGlue(map(e,val2s),", ") + "]";
+    }
+}
+
+val2i(v: vmVal) -> int {
+    switch (v) {
+        vmInt(vv): vv;
+        vmArray(vv): {
+            terminateWithError("Illegal argument. Expected vmInt, found vmArray.");
+            -1;
+        };
+    }
+}
+
+d2t(d: [vmDecl]) -> Tree<string, vmVal> {
+    fold(d, makeTree(), \acc, e -> setTree(acc, e.v.val, initType(e.t)))
+}
+
+initType(t: vmType) -> vmVal {
+    switch(t) {
+        vmIntType(): vmInt(0);
+        vmArrayType(e): vmArray([initType(e)]);
+    }
+}
+
+printvmProg(prog: vmProg) -> void {
+  //  println("Variable declarations: "); 
+   // iter(prog.decl, println);
+    iter(prog.decl, printDecl);
+
+  //  println("Program body: ");
+ //   iter(prog.body, println);
+   iter(prog.body, printVmLine);
+   println(i2s(length(prog.body)) + ":");
+}
+
+terminateWithError(msg: string) {
+    println("Runtime error: " + msg);
+    quit(-1);
+}
+
+nemo2nvm(nemo) {
+    vmProg(
+        decl2nvm(nemo.d),
+        body2nvm(nemo.b)
+    )
+}
+
+decl2nvm(d: [Decl]) -> [vmDecl] {
+    map(d, \e->vmDecl(
+        var2nvm(e.v),
+        type2nvm(e.t)
+    ))
+}
+
+var2nvm(v: Var) -> vmVar {
+    vmVar(v.val)
+}
+
+type2nvm(t: Type) -> vmType {
+    switch (t) {
+        IntType(): vmIntType();
+        ArrayType(v): vmArrayType(type2nvm(v));
+        UnknownType(): vmIntType(); // fallback
+    }
+}
+
+body2nvm(body: Statement) -> [vmLine] {
+    switch (body) {
+        Assign(v,e): [vmLine(0, vmAssign(var2nvm(v), e2nvm(e)), [1])];
+        Test(b) : [vmLine(0, vmTest(bool2nvm(b)), [1])];
+        Sequence(b) : fold(b, [], \acc,e-> {
+            lines = body2nvm(e);
+            len = opMax(acc);
+            concat(acc, labelShift(lines, len))
+        });
+        Selection(b) : fold(b, [vmLine(0, vmTest(vmTrue()), [])], \acc, e -> {
+            lines = body2nvm(e);
+            len = opMax(acc);
+            nlen = len + opMax(lines);
+            concat(
+                mapi(
+                    acc,
+                    \ind, ee -> {
+                        if (ind == 0) {
+                            vmLine(ee.label, ee.instruction, arrayPush(ee.goto, len))
+                        } else {
+                            gotoLineReplace(ee, len, nlen)
+                        }
+                    }
+                ),
+                labelShift(lines, len)
+            )
+        });
+        Iteration(b) : {
+            lines = body2nvm(b);
+            len = opMax(lines);
+            concat(
+                [vmLine(0, vmTest(vmTrue()), [1, len + 1])],
+                map(labelShift(lines, 1), \ee-> gotoLineReplace(ee, len + 1, 0))
+            )
+        };
+        Print(e) : [vmLine(0, vmPrint(e2nvm(e)), [1])];
+    }
+}
+
+e2nvm(e: Expr) -> vmExpr {
+    switch (e) {
+        Array(expr) : vmArray(map(expr, val2nvm));
+        Update(expr, ind, val) : vmUpdate(var2nvm(expr), e2nvm(ind), e2nvm(val));
+        Add(v1,v2) : u2nvm(e);
+        Sub(v1,v2) : u2nvm(e);
+        Mult(v1,v2) : u2nvm(e);
+        Div(v1,v2) : u2nvm(e);
+        Negative(v) : u2nvm(e);
+        Var(v) : u2nvm(e);
+        Int(v) : u2nvm(e);
+        Appeal(arr, expr) : u2nvm(e);
+    }
+}
+
+val2nvm(v: Val) ->vmVal {
+    switch(v) {
+        Array(e): {
+            vmArray(map(e, val2nvm));
+        }
+        Int(val): vmInt(val);
+    }
+}
+
+u2nvm(e: Unit) -> vmUnit {
+    switch (e) {
+        Add(v1,v2) : vmAdd(u2nvm(v1),u2nvm(v2));
+        Sub(v1,v2) : vmSub(u2nvm(v1),u2nvm(v2));
+        Mult(v1,v2) : vmMult(u2nvm(v1),u2nvm(v2));
+        Div(v1,v2) : vmDiv(u2nvm(v1),u2nvm(v2));
+        Negative(v) : vmNegative(u2nvm(v));
+        Var(v) : var2nvm(e);
+        Int(v) : vmInt(v);
+        Appeal(arr, expr) : vmAppeal(var2nvm(arr), e2nvm(expr));
+    }
+}
+
+bool2nvm(b : Bool) -> vmBool {
+    switch (b) {
+        Not(v) : vmNot(bool2nvm(v));
+        And(b1,b2) : vmAnd(bool2nvm(b1),bool2nvm(b2));
+        Or(b1,b2) : vmOr(bool2nvm(b1),bool2nvm(b2));
+        Pred(e1,e2,c) : vmPred(e2nvm(e1),e2nvm(e2),cond2nvm(c));
+    }    
+}
+
+cond2nvm(c: Condition) {
+    switch (c) {
+        Eq() : vmEq();
+        NotEq() : vmNotEq();
+        Gr() : vmGr();
+        GrEq() : vmGrEq();
+        Ls() : vmLsEq();
+        LsEq() : vmLsEq();
+    }
+}
+
+labelShift(l: [vmLine], val: int) -> [vmLine] {
+    map(l, \e-> vmLine(e.label + val, e.instruction, map(e.goto, \ee->ee+val)))
+}
+
+opMax(l: [vmLine]) {
+    length(l)
+}
+
+gotoLineReplace(l: vmLine, old: int, new: int) -> vmLine {
+    vmLine(l.label, l.instruction, map(l.goto, \e->if(e==old)new else e))
+}

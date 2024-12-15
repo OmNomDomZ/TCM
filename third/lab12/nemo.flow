@@ -1,0 +1,224 @@
+// Реализует ключевые структуры данных для AST и проверяет на ошибки
+
+import lingo/pegcode/driver;
+import string;
+import runtime;
+import ds/tree;
+import string;
+
+export {
+    Prog : (d: [Decl], b: Statement);
+
+    Decl : (v: Var, t: Type);
+
+    Type ::= IntType, ArrayType, UnknownType;
+    IntType : ();
+    ArrayType : (t: Type);
+    UnknownType : ();
+
+    Val ::= Int, Array;
+    Expr ::= Array, Update, Unit;
+    Unit ::= Int, Sub, Add, Div, Mult, Negative, Var, Appeal;
+
+    Add : (v1: Unit, v2: Unit);
+    Sub : (v1: Unit, v2: Unit);
+    Mult : (v1: Unit, v2 : Unit);
+    Div : (v1: Unit, v2 : Unit);
+    Negative : (v: Unit);
+    Int : (val: int);
+    Var : (val: string);
+    Array : (e: [Val]);
+    Appeal : (arr: Var, i: Expr);
+    Update : (arr: Var, i: Expr, val: Expr);
+    
+    Statement ::= Assign, Test, Sequence, Selection, Iteration, Print;
+    Assign : (v: Var, e: Expr);
+    Sequence : (seq: [Statement]);
+    Selection : (sel: [Statement]);
+    Iteration : (b: Statement);
+    Print : (e: Expr);
+
+    Test : (b: Bool);
+    Bool ::= And, Or, Not, Pred;
+    And : (b1: Bool, b2: Bool);
+    Or : (b1: Bool, b2: Bool);
+    Not : (b: Bool);
+    Pred : (e1: Expr, e2: Expr, c: Condition);
+    Condition ::= Eq, NotEq, LsEq, GrEq, Ls, Gr;
+    Eq(); NotEq(); LsEq(); GrEq(); Ls(); Gr();
+
+    s2ast(s: string) -> Prog;
+    tryParseNemo(s: string) -> Maybe<Prog>;
+}
+
+buildSub(xs: [flow]) -> Sub;
+buildDiv(xs: [flow]) -> Div;
+buildSel(xs: [flow]) -> Selection;
+buildSeq(xs: [flow]) -> Sequence;
+buildArray(xs: [flow]) -> Array;
+
+buildSub(xs) {
+    fold(xs[1], xs[0], \acc, x -> Sub(acc, x))
+}
+
+buildDiv(xs) {
+    fold(xs[1], xs[0], \acc, x -> Div(acc, x))
+}
+
+buildSel(xs) {
+    Selection(arrayPush(xs[1], xs[0]))
+}
+
+buildSeq(xs) {
+    Sequence(xs[0])
+}
+
+buildArray(xs) {
+    Array(concat(xs[0], xs[1]))
+}
+
+s2ast(s) {
+    parsic(compilePegGrammar("#include nemo.lingo"),
+        s,
+        pegActions(
+            [
+                Pair("buildArray", buildArray),
+                Pair("buildSel", buildSel),
+                Pair("buildSeq", buildSeq),
+                Pair("buildSub", buildSub),
+                Pair("buildDiv", buildDiv)
+            ])
+        )
+}
+
+getTermType(typeMap : Tree<string, Type>, term : Expr) -> Type {
+	binaryOperationType = \e1, e2 -> {
+		e1Type = getTermType(typeMap, e1);
+		e2Type = getTermType(typeMap, e2);
+		if (e1Type == e2Type) {
+			e1Type;
+		} else {
+			UnknownType();
+		}
+	};
+
+	getArrayType = \arr -> switch (arr) {
+		Appeal(ar, a) : switch (getTermType(typeMap, ar)) {
+			ArrayType(c) : c;
+			default : UnknownType();
+		};
+		Update(ar, a, t) : getTermType(typeMap, ar);
+		Var(e1) : either(lookupTree(typeMap, e1), UnknownType());
+        Array(c) : fold(c, IntType(), \acc, v -> switch(acc) {
+			IntType() : switch(v) {
+				Int(s) : IntType();
+				default : UnknownType();
+			}
+			default : UnknownType();
+		});
+        default : UnknownType();
+	};
+
+	switch (term) {
+		Sub(e1, e2) : binaryOperationType(e1, e2);
+		Div(e1, e2) : binaryOperationType(e1, e2);
+		Add(e1, e2) : binaryOperationType(e1, e2);
+		Mult(e1, e2) : binaryOperationType(e1, e2);
+		Negative(e1) : getTermType(typeMap, e1);
+		Int(e1) : IntType();
+		Var(e1) : either(lookupTree(typeMap, e1), UnknownType());
+		Appeal(ar, at) : getArrayType(ar);
+		Update(ar, at, to) : switch(getArrayType(ar)) {
+			IntType() : ArrayType(IntType());
+			default : UnknownType();
+		}
+        Array(c) : switch(getArrayType(Array(c))) {
+			IntType() : ArrayType(IntType());
+			default : UnknownType();
+		}
+	}
+}
+
+/*
+isFormIncorrect(typeMap : Tree<string, Type>, form : Formula) {
+	switch (form) {
+		LNeg(f) : isFormIncorrect(typeMap, f);
+		Eq(e1, e2) : getTermType(typeMap, e1) != getTermType(typeMap, e2); 
+		Neq(e1, e2) : getTermType(typeMap, e1) != getTermType(typeMap, e2);
+		Ge(e1, e2) : getTermType(typeMap, e1) != getTermType(typeMap, e2); 
+		G(e1, e2) : getTermType(typeMap, e1) != getTermType(typeMap, e2);  
+		Le(e1, e2) : getTermType(typeMap, e1) != getTermType(typeMap, e2); 
+		L(e1, e2) : getTermType(typeMap, e1) != getTermType(typeMap, e2); 
+		True() : false;
+		False() : false;
+	}
+} */
+
+isTypesIncorrect(typeMap: Tree<string, Type>, body: Statement) -> bool {
+  switch (body) {
+    Assign(v, e): {
+      // Check if the variable is declared
+      switch(lookupTree(typeMap, v.val)) {
+        Some(valType): {
+          // Check the type of the assigned expression
+          exprType = getTermType(typeMap, e);
+          exprType != UnknownType() && exprType != valType;
+        //  (exprType == UnknownType() || (exprType != UnknownType() && exprType != valType));
+        }
+        None():{
+       /*   println("\n");
+          println("none");*/
+          true; // Variable is not declared
+        } 
+      }
+    }
+    Sequence(bs): fold(bs, false, \res, b -> res || isTypesIncorrect(typeMap, b));
+    Test(b): false; // not implemented yet //isFormIncorrect(typeMap, b);
+    Selection(bs): fold(bs, false, \res, b -> res || isTypesIncorrect(typeMap, b));
+    Print(e): false;
+    Iteration(b): isTypesIncorrect(typeMap, b);  
+  }
+}
+
+getTypeMap(vars : [Decl])-> Tree<string, Type> {
+  pairs2tree(map(vars, \vd -> Pair(vd.v.val, vd.t)))
+}
+
+isContains2Decl(vars : [Decl]) {
+  fold(vars, false, \res, v -> res || (countA(vars, \elem -> elem.v == v.v)) != 1);
+}
+
+CheckRes ::= Error, Success;
+Error   : (info : string);
+Success : (info : string);
+
+CheckProg(nemoProg: Prog) -> CheckRes {
+	vars = nemoProg.d;
+	body = nemoProg.b;
+	typeMap = getTypeMap(vars);
+
+	if (isContains2Decl(vars)) {
+		Error("Double declaration error");
+  } else if (isTypesIncorrect(typeMap, body)) {
+    Error("Types mismatch or var wasn't declared or assigned any value");
+  }else {
+    Success("noway");
+  }
+}
+
+tryParseNemo(s: string) -> Maybe<Prog> {
+    prog = s2ast(s);
+    println("Parsed PEG: ");
+    println(prog);
+    println("\n\n");
+
+    switch(CheckProg(prog)) {
+		Error(info) : { 
+      println("ERROR: " + info); 
+      None(); 
+    }
+		Success(info) : {
+      Some(prog);
+		}
+	}
+ }

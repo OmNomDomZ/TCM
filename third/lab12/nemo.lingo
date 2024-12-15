@@ -1,0 +1,56 @@
+// синтаксис
+
+prog = ws decl*:d body:b { Prog(:d, :b) };
+
+// var declaration
+decl = "VAR" ws var:v ":" ws type:t ";" ws { Decl(:v, :t) };
+
+// types
+type  = int_t | array_t;
+int_t   = "INT" ws { IntType() };
+array_t = "ARRAY OF" ws type:t  { ArrayType(:t) };
+
+// expression types
+expr = update | const_array | ar_expr ;
+
+ar_expr = ws sum:s {:s};
+sum = sub:p1 "+" ws sum:p2 { Add(:p1, :p2) } | sub;
+sub = divide:s1 _sub+:s2 { buildSub(:s1, :s2) } | divide;
+_sub = '-' ws divide:s {:s};
+divide = product:i1 _divide+:i2 { buildDiv(:i1, :i2) } | product;
+_divide = '/' ws product:s {:s};
+product = unary:i1 "*" ws product:i2 { Mult(:i1, :i2) } | unary;
+unary = '-' ws unit:n { Negative(:n) } | unit;
+unit = atom | '(' ar_expr:e ')' ws { :e };
+atom = appeal | number | var;
+var = (letter + '_'* digit*)+$d ws { Var($d) };
+number = digit+$d ws { Int(s2i($d)) };
+appeal = "APP" ws "(" ws var:arr "," ws expr:i ")" ws { Appeal(:arr, :i) };
+/*only array usage*/
+const_array = "[" ws (number | const_array)?:e1 ("," ws (number | const_array))*:e2 "]" ws { buildArray(:e1, :e2) };
+update = "UPD" ws "(" ws var:arr "," ws expr:i "," ws expr:val ")" ws { Update(:arr, :i, :val) };
+
+// prog body 
+body = ws statement;
+statement = assign | test | print | sequence | selection | iteration;
+
+sequence = "{" ws _seq+:s "}" ws { buildSeq(:s) };
+_seq = statement:s ";" ws {:s};
+selection = "{" ws statement:s ("U" ws statement)+:s1 "}" ws { buildSel(:s, :s1) };
+iteration = "{" ws statement:s ws "}" ws "*" { Iteration(:s) };
+assign = var:v ":=" ws expr:e { Assign(:v, :e) };
+print = "print" ws "(" ws expr:e ")" ws { Print(:e) };
+
+// logic ops
+test = ws "(" ws or:p ")" ws "?" ws { Test(:p) };
+or = and:e1 "or" ws or:e2 { Or(:e1, :e2) } | and;
+and = not:e1 "and" ws and:e2 { And(:e1, :e2) } | not;
+not = "NOT" ws bool:b { Not(:b) } | bool;
+bool = pred | ws "(" ws or:e ")" ws { :e };
+pred = expr:e1 cond:c ws expr:e2 { Pred(:e1, :e2, :c) };
+cond = "!=" { NotEq() } | "==" { Eq() }| "<=" { LsEq() }| ">=" { GrEq() } | "<" { Ls() } | ">" { Gr() };
+
+// other
+letter = 'a'-'z' | 'A'-'Z';
+digit  = '0'-'9';
+ws = (' ' | '\t' | '\n' | '\r')*;
